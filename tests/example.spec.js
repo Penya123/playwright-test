@@ -43,7 +43,7 @@ test('Test Kanban Web App', async ({ page }) => {
         await page.mouse.click(10, 10); // Salirse de la página de edición de la task
 
         // Conseguir las subtast desde el texto
-        const [complitedSubtasks, totalTasks] = (await page.locator("section").first().locator("article").last().textContent()).match(/\d+/g).map(Number);
+        const [complitedSubtasks, totalTasks] = (await page.locator("section").first().locator("article").last().locator("p").textContent()).match(/\d+/g).map(Number);
 
         return complitedSubtasks;
     }
@@ -62,7 +62,7 @@ test('Test Kanban Web App', async ({ page }) => {
     let complited = 0, total = 0, i = 0;
     let taskName = ""
     for (i; i < secondColumnTasks; i++) {
-        const subtasks = await secondColumn.nth(i).textContent();
+        const subtasks = await secondColumn.nth(i).locator("p").textContent();
 
         // Conseguir las subtast desde el texto
         [complited, total] = subtasks.match(/\d+/g).map(Number);
