@@ -1,41 +1,71 @@
-const { test, expect } = require("@playwright/test");
-const { KanbanPage } = require("../pages/kanbanPage");
+// @ts-check
+import { defineConfig, devices } from '@playwright/test';
 
-const FIRST_COLUMN = 0;
-const SECOND_COLUMN = 1;
+/**
+ * Read environment variables from file.
+ * https://github.com/motdotla/dotenv
+ */
+// import dotenv from 'dotenv';
+// import path from 'path';
+// dotenv.config({ path: path.resolve(__dirname, '.env') });
 
-test("Edit a Kanban Card: completar subtask y mover a la primera columna", async ({ page }) => {
-    const kanban = new KanbanPage(page);
-    await kanban.goto();
+/**
+ * @see https://playwright.dev/docs/test-configuration
+ */
+export default defineConfig({
+    testDir: './tests',
+    /* Run tests in files in parallel */
+    fullyParallel: true,
+    /* Fail the build on CI if you accidentally left test.only in the source code. */
+    forbidOnly: !!process.env.CI,
+    /* Retry on CI only */
+    retries: process.env.CI ? 2 : 0,
+    /* Opt out of parallel tests on CI. */
+    workers: process.env.CI ? 1 : undefined,
+    /* Reporter to use. See https://playwright.dev/docs/test-reporters */
+    reporter: [['html']],
+    /* Shared settings for all the projects below. See https://playwright.dev/docs/api/class-testoptions. */
+    use: {
+        /* Base URL to use in actions like `await page.goto('')`. */
+        // baseURL: 'http://localhost:3000',
 
-    let candidate = await test.step("Buscar una carta con subtasks incompletos en la segunda columna", async () => {
-        return kanban.findIncompleteCard(SECOND_COLUMN);
-    });
+        /* Collect trace when retrying the failed test. See https://playwright.dev/docs/trace-viewer */
+        trace: 'on',
+    },
 
-    if (!candidate) {
-        await test.step("No había candidatas: crear una nueva task", async () => {
-            const title = await kanban.createTask();
-            const lastIndex = (await kanban.cardsInColumn(SECOND_COLUMN).count()) - 1;
-            candidate = { index: lastIndex, title, completed: 0, total: 2 };
-        });
-    }
+    /* Configure projects for major browsers */
+    projects: [
+        {
+            name: 'chromium',
+            use: { ...devices['Desktop Chrome'] },
+        },
 
-    await test.step("Abrir la carta y completar un subtask", async () => {
-        await kanban.openCard(SECOND_COLUMN, candidate.index);
-        const subtaskLocator = await kanban.completeFirstPendingSubtask();
-        await expect(subtaskLocator).toHaveCSS("text-decoration-line", "line-through");
-    });
+        /* Test against mobile viewports. */
+        // {
+        //   name: 'Mobile Chrome',
+        //   use: { ...devices['Pixel 5'] },
+        // },
+        // {
+        //   name: 'Mobile Safari',
+        //   use: { ...devices['iPhone 12'] },
+        // },
 
-    await test.step("Mover la carta a la primera columna y cerrar el editor", async () => {
-        await kanban.moveCardToFirstColumn();
-        await kanban.closeCardEditor();
-    });
+        /* Test against branded browsers. */
+        // {
+        //   name: 'Microsoft Edge',
+        //   use: { ...devices['Desktop Edge'], channel: 'msedge' },
+        // },
+        // {
+        //   name: 'Google Chrome',
+        //   use: { ...devices['Desktop Chrome'], channel: 'chrome' },
+        // },
+    ],
 
-    await test.step("Verificar que la carta se movió y su contador incrementó", async () => {
-        const movedCard = kanban.cardsInColumn(FIRST_COLUMN).filter({ hasText: candidate.title });
-        await expect(movedCard).toBeVisible();
-
-        const { completed } = await kanban.getCardProgress(movedCard);
-        expect(completed).toBe(candidate.completed + 1);
-    });
+    /* Run your local dev server before starting the tests */
+    // webServer: {
+    //   command: 'npm run start',
+    //   url: 'http://localhost:3000',
+    //   reuseExistingServer: !process.env.CI,
+    // },
 });
+
