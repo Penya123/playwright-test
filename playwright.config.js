@@ -1,5 +1,5 @@
 const { test, expect } = require("@playwright/test");
-const { KanbanPage } = require("../pages/KanbanPage");
+const { KanbanPage } = require("../pages/kanbanPage");
 
 const FIRST_COLUMN = 0;
 const SECOND_COLUMN = 1;
