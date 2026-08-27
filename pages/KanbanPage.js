@@ -2,7 +2,6 @@ class KanbanPage {
     constructor(page) {
         this.page = page;
 
-        // Selectores centralizados — si la UI cambia, aquí es el ÚNICO lugar que se toca
         this.addTaskButton = page.locator("button.hidden");
         this.titleInput = page.locator("#Title");
         this.descriptionInput = page.locator("#Description");
@@ -12,38 +11,33 @@ class KanbanPage {
         this.columnMoveOptions = page.locator("div div.hidden.absolute.rounded div");
         this.submitButton = page.locator('button[type="submit"]');
         this.columns = page.locator("section");
+        this.subtaskLabels = page.locator("div label span");
     }
 
     async goto() {
         await this.page.goto("https://kanban-566d8.firebaseapp.com/");
     }
 
-    column(index) {
-        return this.columns.nth(index);
+    cardsInColumn(columnIndex) {
+        return this.columns.nth(columnIndex).locator("article");
     }
 
-    cardsInColumn(index) {
-        return this.column(index).locator("article");
+    findCardByTitleInColumn(columnIndex, title) {
+        return this.cardsInColumn(columnIndex).filter({ hasText: title });
     }
 
-    // --- Creación de tareas ---
-    async createTask({ title = "Random task", subtasks = ["First subtask", "Second subtask"] } = {}) {
+    async createTask({ title = "Random task" } = {}) {
         await this.addTaskButton.click();
         await this.titleInput.fill(title);
         await this.descriptionInput.fill("Random task description");
-
-        for (let i = 0; i < subtasks.length; i++) {
-            await this.subtaskInputs.nth(i + 1).fill(subtasks[i]);
-        }
-
+        await this.subtaskInputs.nth(1).fill("First subtask");
+        await this.subtaskInputs.nth(2).fill("Second subtask");
         await this.statusDropdown.nth(1).click();
         await this.dropdownOptions.nth(2).click();
         await this.submitButton.click();
-
-        return title; // el llamador decide qué hacer con esto
+        return title;
     }
 
-    // --- Lectura de datos de una carta ---
     async getCardProgress(card) {
         const text = await card.locator("p").textContent();
         const match = text.match(/(\d+)\s+of\s+(\d+)\s+substasks/);
@@ -55,37 +49,42 @@ class KanbanPage {
         return (await card.locator("h3").textContent()).trim();
     }
 
-    // --- Búsqueda de una carta candidata ---
     async findIncompleteCard(columnIndex) {
-        const cards = this.cardsInColumn(columnIndex);
-        const count = await cards.count();
+        const cards = await this.cardsInColumn(columnIndex).all();
 
-        for (let i = 0; i < count; i++) {
-            const card = cards.nth(i);
+        for (const card of cards) {
             const { completed, total } = await this.getCardProgress(card);
             if (completed !== total) {
-                return { index: i, title: await this.getCardTitle(card), completed, total };
+                return { card, title: await this.getCardTitle(card), completed, total };
             }
         }
-        return null; // ninguna candidata: el llamador decide qué hacer
+        return null;
     }
 
-    // --- Acciones dentro del editor de carta ---
-    async openCard(columnIndex, cardIndex) {
-        await this.cardsInColumn(columnIndex).nth(cardIndex).click();
+    async getOrCreateIncompleteCard(columnIndex) {
+        const existing = await this.findIncompleteCard(columnIndex);
+        if (existing) return existing;
+
+        const title = await this.createTask();
+        const cards = await this.cardsInColumn(columnIndex).all();
+        const newCard = cards[cards.length - 1];
+        return { card: newCard, title, completed: 0, total: 2 };
+    }
+
+    async openCard(card) {
+        await card.click();
     }
 
     async completeFirstPendingSubtask() {
-        const subtasks = this.page.locator("div label span");
-        const count = await subtasks.count();
+        const labels = await this.subtaskLabels.all();
 
-        for (let j = 0; j < count; j++) {
-            const isDone = await subtasks.nth(j).evaluate(
+        for (const label of labels) {
+            const isDone = await label.evaluate(
                 el => getComputedStyle(el).textDecorationLine.includes("line-through")
             );
             if (!isDone) {
-                await subtasks.nth(j).click();
-                return subtasks.nth(j); // regresa el locator por si el test quiere verificarlo
+                await label.click();
+                return label;
             }
         }
         throw new Error("No se encontró ningún subtask pendiente por completar");
