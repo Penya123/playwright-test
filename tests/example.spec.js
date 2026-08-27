@@ -8,20 +8,13 @@ test("Edit a Kanban Card: completar subtask y mover a la primera columna", async
     const kanban = new KanbanPage(page);
     await kanban.goto();
 
-    let candidate = await test.step("Buscar una carta con subtasks incompletos en la segunda columna", async () => {
-        return kanban.findIncompleteCard(SECOND_COLUMN);
-    });
-
-    if (!candidate) {
-        await test.step("No había candidatas: crear una nueva task", async () => {
-            const title = await kanban.createTask();
-            const lastIndex = (await kanban.cardsInColumn(SECOND_COLUMN).count()) - 1;
-            candidate = { index: lastIndex, title, completed: 0, total: 2 };
-        });
-    }
+    const candidate = await test.step(
+        "Obtener una carta con subtasks incompletos (o crear una)",
+        () => kanban.getOrCreateIncompleteCard(SECOND_COLUMN)
+    );
 
     await test.step("Abrir la carta y completar un subtask", async () => {
-        await kanban.openCard(SECOND_COLUMN, candidate.index);
+        await kanban.openCard(candidate.card);
         const subtaskLocator = await kanban.completeFirstPendingSubtask();
         await expect(subtaskLocator).toHaveCSS("text-decoration-line", "line-through");
     });
@@ -32,7 +25,7 @@ test("Edit a Kanban Card: completar subtask y mover a la primera columna", async
     });
 
     await test.step("Verificar que la carta se movió y su contador incrementó", async () => {
-        const movedCard = kanban.cardsInColumn(FIRST_COLUMN).filter({ hasText: candidate.title });
+        const movedCard = kanban.findCardByTitleInColumn(FIRST_COLUMN, candidate.title);
         await expect(movedCard).toBeVisible();
 
         const { completed } = await kanban.getCardProgress(movedCard);
